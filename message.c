@@ -1,5 +1,4 @@
 #include "socket.h"
-#include "util.h"
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -13,7 +12,6 @@ int send_format(SOCKET socket, char *fmt, ...) {
   va_start(va, fmt);
   int length = vsnprintf(scratch_buffer, SCRATCH_LENGTH, fmt, va);
   if (length < 0 || length >= SCRATCH_LENGTH) {
-    eprintf("vsnprintf returned %d\n", length);
     return -1;
   }
   scratch_buffer[length] = '\0';

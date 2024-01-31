@@ -24,9 +24,11 @@ int main() {
   int mode = query_choice("Client or server?", "cs");
 
   if (mode == 'c') {
-    client_run();
+    Client *client = new Client();
+    client->run();
   } else if (mode == 's') {
-    server_run();
+    Server *server = new Server();
+    server->run();
   } else {
     printf("Invalid input.\n");
   }
