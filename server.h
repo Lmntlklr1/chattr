@@ -1,4 +1,7 @@
 #include "socket.h"
+#include <iostream>
+
+using namespace std;
 
 // Maximum users
 #define MAX_CONNECTIONS 20
@@ -9,9 +12,9 @@
 class User;
 class Server;
 
-class Connection {
-  SOCKET socket;
-  struct in_addr addr;
+struct Connection {
+  SOCKET sock;
+  //struct in_addr addr;
   User *user_id;
 };
 
@@ -22,7 +25,13 @@ class Connection {
 /* }; */
 
 class Server {
-  SOCKET socket;
+public:
+  int init();
+  int handleConnect(SOCKET new_socket, struct in_addr addr);
+  int processMessage(SOCKET sock);
+  void run();
+private:
+  SOCKET sock;
   short port;
   fd_set fds;
   SOCKET max_fd;

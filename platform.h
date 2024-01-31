@@ -1,9 +1,11 @@
 #pragma once
 
-#ifdef _WIN32
 #include <winsock2.h>
 #pragma comment(lib, "Ws2_32.lib")
 #include "stdint.h"
+#include <iostream>
+
+using namespace std;
 
 // Winsock startup function.
 inline int startup()
@@ -42,4 +44,3 @@ inline int getError()
 
 // Helper function for sending TCP data.
 int sendTcpData(SOCKET skSocket, const char *data, uint16_t length);
-#endif

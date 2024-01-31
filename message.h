@@ -1,4 +1,6 @@
 #include "socket.h"
+#include <iostream>
 
-int send_format(SOCKET socket, ...);
-int await_message(int sfd, char **buffer);
+using namespace std;
+
+int awaitMessage(int sfd, string message);

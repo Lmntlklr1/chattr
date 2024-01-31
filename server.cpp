@@ -12,34 +12,34 @@ int Server::init() {
   cout << "Enter a port: ";
   cin >> port;
 
-  cout << "Making socket on port " << port << endl;
-  socket = make_socket(port);
-  if (socket < 0)
+  cout << "Making sock on port " << port << endl;
+  sock = makeServerSocket(port);
+  if (sock < 0)
     return -1;
   std::cout << "Socket bound and listening...\n";
 
-  FD_SET(socket, &fds);
-  max_fd = socket;
+  FD_SET(sock, &fds);
+  max_fd = sock;
   return 0;
 }
 
 int Server::handleConnect(SOCKET new_socket, struct in_addr addr) {
   int i;
   for (i = 0; i < MAX_CONNECTIONS; i++) {
-    // socket == 0 means the connection slot is free.
-    if (connections[i].socket == 0)
+    // sock == 0 means the connection slot is free.
+    if (connections[i].sock == 0)
       break;
   }
   if (i == MAX_CONNECTIONS) {
-    send_format(new_socket, "No more room on this  sorry.");
+    sendString(new_socket, "No more room on this  sorry.");
     close(new_socket);
     return -1;
   }
-  send_format(new_socket, "Welcome!");
+  sendString(new_socket, "Welcome!");
   if (new_socket > max_fd)
     max_fd = new_socket;
   // We're accepting this connection. Add it to our list
-  connections[i].socket = new_socket;
+  connections[i].sock = new_socket;
   connections[i].addr = addr;
   connections[i].user_id = NULL;
   connections[i].room = NULL;
@@ -49,7 +49,7 @@ int Server::handleConnect(SOCKET new_socket, struct in_addr addr) {
 
 int Server::processMessage(SOCKET skt) {
   string message;
-  int recv_result = recvMessage(sdk, &message);
+  int recv_result = recvMessage(skt, &message);
   if (recv_result < 0) {
     cout << "Error " << recv_result;
     return -1;
@@ -59,9 +59,9 @@ int Server::processMessage(SOCKET skt) {
   }
   cout << "Recieved " << message;
   for (int i = 0; i < MAX_CONNECTIONS; i++) {
-    SOCKET socket = connections[i].socket;
-    if (socket) {
-      sendString(socket, message);
+    SOCKET sock = connections[i].sock;
+    if (sock) {
+      sendString(sock, message);
     }
   }
   return 1;
@@ -69,14 +69,14 @@ int Server::processMessage(SOCKET skt) {
 
 void Server::run() {
   if (init() < 0)
-    goto abort;
+    return;
 
   while (1) {
     fd_set read_fds = fds;
     int select_result = select(max_fd + 1, &read_fds, NULL, NULL, NULL);
     if (select_result < 0) {
       cout << "Error select failed";
-      goto abort;
+      return;
     } else if (select_result == 0) {
       continue;
     }
@@ -84,25 +84,25 @@ void Server::run() {
     /* printf("read_fds = %d\n", ((unsigned int*)&read_fds)[0]); */
     for (int i = 0; i <= max_fd; i++) {
       if (FD_ISSET(i, &read_fds)) {
-        if (i == socket) {
+        if (i == sock) {
           // New connection
           struct in_addr addr;
-          SOCKET new_socket = acceptConnection(socket, &addr);
+          SOCKET new_socket = acceptConnection(sock, &addr);
           if (new_socket < 0)
-            goto abort;
+            return;
           if (handleConnect(&new_socket, addr) < 0) {
-            goto abort;
+            return;
           }
         } else {
           if (processMessage(i) < 0)
-            goto abort;
+            return;
         }
       }
     }
   }
 
   struct in_addr addr = {0};
-  int connected_socket = acceptConnection(socket, &addr);
+  int connected_socket = acceptConnection(sock, &addr);
   if (connected_socket < 0)
     cout << "Errror";
   cout << "Accepting connection on " << connected_socket << endl;
@@ -112,9 +112,9 @@ void Server::run() {
     cout << "Aborting server.\n";
     return;
   } else if (count > 0) {
-    printf("Recieved '%s'\n", buffer);
+    cout << buffer << endl;
   } else {
-    printf("Recieved empty message.\n");
+    cout << "Recieved empty message.\n";
   }
 
   return;

@@ -1,10 +1,8 @@
-#ifdef _WIN32
 #include "util.h"
 #include "socket.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <winsock2.h>
 #include <ws2tcpip.h>
 
 int set_socket_nonblocking(SOCKET sock) {
@@ -18,7 +16,7 @@ int set_socket_nonblocking(SOCKET sock) {
   return 0;
 }
 
-SOCKET make_client_socket(const char *ip_addr, int port) {
+SOCKET makeClientSocket(const string ip_addr, int port) {
   SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (sock == INVALID_SOCKET) {
     perror("Error: Couldn't make socket");
@@ -42,7 +40,7 @@ SOCKET make_client_socket(const char *ip_addr, int port) {
   return sock;
 }
 
-SOCKET make_server_socket(int port) {
+SOCKET makeServerSocket(int port) {
   SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (sock == INVALID_SOCKET) {
     perror("Server: Couldn't make socket");
@@ -58,7 +56,7 @@ SOCKET make_server_socket(int port) {
     perror("Server: Couldn't bind to port");
     return -1;
   }
-  // Hardcode backlog of 20.
+  // Hardcode backlog of 20.socket
   int listen_result = listen(sock, 20);
   if (listen_result == SOCKET_ERROR) {
     closesocket(sock);
@@ -72,7 +70,7 @@ SOCKET make_server_socket(int port) {
   return sock;
 }
 
-SOCKET accept_connection(SOCKET sock, struct in_addr *client_addr) {
+SOCKET acceptConnection(SOCKET sock, struct in_addr *client_addr) {
   struct sockaddr_in addr = {0};
   int addrlen = sizeof(addr);
   SOCKET new_sock = accept(sock, (struct sockaddr *)&addr, &addrlen);
@@ -88,9 +86,9 @@ SOCKET accept_connection(SOCKET sock, struct in_addr *client_addr) {
   return new_sock;
 }
 
-int send_string(SOCKET sock, char *string) {
-  unsigned short length = strlen(string);
-  char *buffer = malloc(2 + length);
+int sendString(SOCKET sock, string str) {
+  unsigned short length = strlen(str);
+  char *buffer = new char [2 + length];
   if (buffer == NULL) {
     fprintf(stderr, "Unable to allocate buffer to send string. Aborting..\n");
     closesocket(sock);
@@ -103,15 +101,13 @@ int send_string(SOCKET sock, char *string) {
   int send_result = send(sock, buffer, length + 2, 0);
   if (send_result == SOCKET_ERROR) {
     perror("Unable to send message");
-    free(buffer);
     closesocket(sock);
     return -1;
   }
-  free(buffer);
   return 0;
 }
 
-int recv_message(SOCKET sock, char **buffer) {
+int recvMessage(SOCKET sock, string *buffer) {
   unsigned short length;
   int recv_result;
   recv_result = recv(sock, (char *)&length, 2, MSG_WAITALL);
@@ -132,8 +128,8 @@ int recv_message(SOCKET sock, char **buffer) {
     return -1;
   }
   length = ntohs(length);
-  *buffer = (char *)realloc(*buffer, length + 1);
-  recv_result = recv(sock, *buffer, length, MSG_WAITALL);
+  *buffer.resize(length + 1);
+  recv_result = recv(sock, buffer->c_str(), length, MSG_WAITALL);
   if (recv_result == SOCKET_ERROR) {
     perror("Unable to recv message body");
     closesocket(sock);
@@ -143,11 +139,11 @@ int recv_message(SOCKET sock, char **buffer) {
     closesocket(sock);
     return -1;
   }
-  (*buffer)[length] = '\0';
+  (buffer->str())[length] = '\0';
   return length;
 }
 
-void inet_to_string(struct in_addr addr, char *buffer) {
-  inet_ntop(AF_INET, &addr, buffer, INET_ADDRSTRLEN);
+void inetToString(struct in_addr addr, string buffer) {
+  buffer.resize(16);
+  inet_ntop(AF_INET, &addr, buffer.c_str(), INET_ADDRSTRLEN);
 }
-#endif

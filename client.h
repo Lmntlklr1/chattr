@@ -1,10 +1,17 @@
 #include "socket.h"
+#include <iostream>
 
-typedef struct client_t {
-  SOCKET socket;
-  char *server;
+using namespace std;
+
+class Client {
+public:  
+  int init();
+  int processMessages();
+  void run();
+
+private:
+  SOCKET sock;
+  string server;
   short port;
-  char *username;
-} client_t;
-
-void client_run();
+  string username;
+};

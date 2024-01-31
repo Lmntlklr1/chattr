@@ -1,15 +1,15 @@
 CC = gcc
 CFLAGS = -Wall -g
 BIN = chattr
-SRCS = $(wildcard *.c)
-OBJS = $(SRCS:.c=.o)
+SRCS = $(wildcard *.cpp)
+OBJS = $(SRCS:.cpp=.o)
 
 all: $(BIN)
 
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^
 
-%.o: %.c
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
