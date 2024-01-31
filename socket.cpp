@@ -1,16 +1,21 @@
-#include "util.h"
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include "socket.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ws2tcpip.h>
 
+
+void SOCKETerror(string str) {
+    cout << str << " : " << WSAGetLastError() << "\n";
+}
+
 int set_socket_nonblocking(SOCKET sock) {
   printf("Setting socket %llu as non-blocking\n", (unsigned long long)sock);
   u_long mode = 1; // 1 to enable non-blocking socket
   if (ioctlsocket(sock, FIONBIO, &mode) != 0) {
     closesocket(sock);
-    perror("Error: Unable to set socket as non-blocking");
+    SOCKETerror("Error: Unable to set socket as non-blocking");
     return -1;
   }
   return 0;
@@ -19,18 +24,18 @@ int set_socket_nonblocking(SOCKET sock) {
 SOCKET makeClientSocket(const string ip_addr, int port) {
   SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (sock == INVALID_SOCKET) {
-    perror("Error: Couldn't make socket");
+      SOCKETerror("Error: Couldn't make socket");
     return -1;
   }
 
   struct sockaddr_in addr = {0};
   addr.sin_family = AF_INET;
-  addr.sin_addr.s_addr = inet_addr(ip_addr);
+  addr.sin_addr.s_addr = inet_addr(ip_addr.c_str());
   addr.sin_port = htons(port);
   int connect_result = connect(sock, (struct sockaddr *)&addr, sizeof(addr));
   if (connect_result == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) {
     closesocket(sock);
-    perror("Error: Unable to connect");
+    SOCKETerror("Error: Unable to connect");
     return -1;
   }
   if (set_socket_nonblocking(sock) < 0) {
@@ -43,7 +48,7 @@ SOCKET makeClientSocket(const string ip_addr, int port) {
 SOCKET makeServerSocket(int port) {
   SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (sock == INVALID_SOCKET) {
-    perror("Server: Couldn't make socket");
+    SOCKETerror("Server: Couldn't make socket");
     return -1;
   }
   struct sockaddr_in addr = {0};
@@ -53,14 +58,14 @@ SOCKET makeServerSocket(int port) {
   int bind_result = bind(sock, (struct sockaddr *)&addr, sizeof(addr));
   if (bind_result == SOCKET_ERROR) {
     closesocket(sock);
-    perror("Server: Couldn't bind to port");
+    SOCKETerror("Server: Couldn't bind to port");
     return -1;
   }
   // Hardcode backlog of 20.socket
   int listen_result = listen(sock, 20);
   if (listen_result == SOCKET_ERROR) {
     closesocket(sock);
-    perror("Server: Couldn't listen to port");
+    SOCKETerror("Server: Couldn't listen to port");
     return -1;
   }
   if (set_socket_nonblocking(sock) < 0) {
@@ -75,7 +80,7 @@ SOCKET acceptConnection(SOCKET sock, struct in_addr *client_addr) {
   int addrlen = sizeof(addr);
   SOCKET new_sock = accept(sock, (struct sockaddr *)&addr, &addrlen);
   if (new_sock == INVALID_SOCKET) {
-    perror("Server: Couldn't accept connection");
+    SOCKETerror("Server: Couldn't accept connection");
     return -1;
   }
   memcpy(client_addr, &addr.sin_addr, sizeof(struct in_addr));
@@ -87,7 +92,7 @@ SOCKET acceptConnection(SOCKET sock, struct in_addr *client_addr) {
 }
 
 int sendString(SOCKET sock, string str) {
-  unsigned short length = strlen(str);
+  unsigned short length = str.length();
   char *buffer = new char [2 + length];
   if (buffer == NULL) {
     fprintf(stderr, "Unable to allocate buffer to send string. Aborting..\n");
@@ -97,27 +102,27 @@ int sendString(SOCKET sock, string str) {
   // Store the length first
   *(unsigned short *)buffer = htons(length);
   // Then the string
-  memcpy(buffer + 2, string, length);
+  memcpy(buffer + 2, str.c_str(), length);
   int send_result = send(sock, buffer, length + 2, 0);
   if (send_result == SOCKET_ERROR) {
-    perror("Unable to send message");
+      SOCKETerror("Unable to send message");
     closesocket(sock);
     return -1;
   }
   return 0;
 }
 
-int recvMessage(SOCKET sock, string *buffer) {
+int recvMessage(SOCKET sock, string* str) {
   unsigned short length;
   int recv_result;
-  recv_result = recv(sock, (char *)&length, 2, MSG_WAITALL);
+  recv_result = recv(sock, (char *)&length, 2, 0);
 
   if (recv_result == SOCKET_ERROR) {
     if (WSAGetLastError() == WSAEWOULDBLOCK) {
       // Not a real error code. Ignore
       return 0;
     }
-    perror("Error: Unable to recv message length");
+    SOCKETerror("Error: Unable to recv message length");
     closesocket(sock);
     return -1;
   } else if (recv_result == 0) {
@@ -128,10 +133,10 @@ int recvMessage(SOCKET sock, string *buffer) {
     return -1;
   }
   length = ntohs(length);
-  *buffer.resize(length + 1);
-  recv_result = recv(sock, buffer->c_str(), length, MSG_WAITALL);
+  char* buffer = new char[length + 1];
+  recv_result = recv(sock, buffer, length, 0);
   if (recv_result == SOCKET_ERROR) {
-    perror("Unable to recv message body");
+    SOCKETerror("Unable to recv message body");
     closesocket(sock);
     return -1;
   } else if (recv_result < length) {
@@ -139,11 +144,13 @@ int recvMessage(SOCKET sock, string *buffer) {
     closesocket(sock);
     return -1;
   }
-  (buffer->str())[length] = '\0';
+  buffer[length] = '\0';
+  *str = buffer;
   return length;
 }
 
-void inetToString(struct in_addr addr, string buffer) {
-  buffer.resize(16);
-  inet_ntop(AF_INET, &addr, buffer.c_str(), INET_ADDRSTRLEN);
+string inetToString(struct in_addr addr) {
+  char* buffer = new char[22];
+  inet_ntop(AF_INET, &addr, buffer, INET_ADDRSTRLEN);
+  return string(buffer);
 }

@@ -57,7 +57,7 @@ void Client::run() {
     cout << "Aborting client..";
     return;
   }
-  string buffer = NULL;
+  string buffer;
   while (1) {
     processMessages();
     printf("\r> ");
@@ -66,7 +66,7 @@ void Client::run() {
       // Empty message. Just pull new messages again.
       continue;
     }
-    buffer[buffer.length()-1] = '\0';
+  //  buffer[buffer.length()] = '\0';
     cout << "Sending " << buffer << endl;
     if (sendString(sock, buffer) < 0) {
       cout << "Error sending message\n";

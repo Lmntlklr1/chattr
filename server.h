@@ -14,8 +14,8 @@ class Server;
 
 struct Connection {
   SOCKET sock;
-  //struct in_addr addr;
-  User *user_id;
+  struct in_addr addr;
+  string user_id;
 };
 
 /* class User { */
@@ -30,6 +30,7 @@ public:
   int handleConnect(SOCKET new_socket, struct in_addr addr);
   int processMessage(SOCKET sock);
   void run();
+  Connection* GetConnectionFromSocket(SOCKET sock);
 private:
   SOCKET sock;
   short port;

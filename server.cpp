@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 int Server::init() {
   FD_ZERO(&fds);
@@ -23,6 +22,18 @@ int Server::init() {
   return 0;
 }
 
+Connection* Server::GetConnectionFromSocket(SOCKET sock)
+{
+    for (int i = 0; i < MAX_CONNECTIONS; i++)
+    {
+        if (connections[i].sock == sock)
+        {
+            return &connections[i];
+        }
+    }
+    return NULL;
+}
+
 int Server::handleConnect(SOCKET new_socket, struct in_addr addr) {
   int i;
   for (i = 0; i < MAX_CONNECTIONS; i++) {
@@ -32,7 +43,7 @@ int Server::handleConnect(SOCKET new_socket, struct in_addr addr) {
   }
   if (i == MAX_CONNECTIONS) {
     sendString(new_socket, "No more room on this  sorry.");
-    close(new_socket);
+    closesocket(new_socket);
     return -1;
   }
   sendString(new_socket, "Welcome!");
@@ -41,8 +52,6 @@ int Server::handleConnect(SOCKET new_socket, struct in_addr addr) {
   // We're accepting this connection. Add it to our list
   connections[i].sock = new_socket;
   connections[i].addr = addr;
-  connections[i].user_id = NULL;
-  connections[i].room = NULL;
   FD_SET(new_socket, &fds);
   return 0;
 }
@@ -51,17 +60,26 @@ int Server::processMessage(SOCKET skt) {
   string message;
   int recv_result = recvMessage(skt, &message);
   if (recv_result < 0) {
-    cout << "Error " << recv_result;
+    cout << "Error " << recv_result << "\n";
     return -1;
   } else if (recv_result == 0) {
     // Nothing to read
     return 0;
   }
-  cout << "Recieved " << message;
+  Connection* cnct = GetConnectionFromSocket(skt);
+  char buffer[100];
+  int ifcheck = sscanf_s(message.c_str(), "/identify %s", buffer, 100);
+  if (ifcheck == 1)
+  {
+      buffer[99] = '\0';
+      cnct->user_id = buffer;
+  }
+  cout << "Recieved " <<  message << "\n";
+  sprintf_s(buffer, "%s : %s", cnct->user_id.c_str(), message.c_str());
   for (int i = 0; i < MAX_CONNECTIONS; i++) {
     SOCKET sock = connections[i].sock;
     if (sock) {
-      sendString(sock, message);
+      sendString(sock, buffer);
     }
   }
   return 1;
@@ -90,7 +108,7 @@ void Server::run() {
           SOCKET new_socket = acceptConnection(sock, &addr);
           if (new_socket < 0)
             return;
-          if (handleConnect(&new_socket, addr) < 0) {
+          if (handleConnect(new_socket, addr) < 0) {
             return;
           }
         } else {
