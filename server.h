@@ -4,7 +4,7 @@
 using namespace std;
 
 // Maximum users
-#define MAX_CONNECTIONS 20
+#define MAX_CONNECTIONS 3
 #define MAX_USERS 100
 #define MAX_ROOMS 10
 #define MAX_USERS_PER_ROOM 10

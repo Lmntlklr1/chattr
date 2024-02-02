@@ -74,8 +74,16 @@ int Server::processMessage(SOCKET skt) {
       buffer[99] = '\0';
       cnct->user_id = buffer;
   }
+  ifcheck = sscanf_s(message.c_str(), "/disconnect %s", buffer, 100);
+  if (ifcheck == 1)
+  {
+      buffer[99] = '\0';
+      cnct->user_id = buffer;
+      closesocket(cnct->sock);
+  }
   cout << "Recieved " <<  message << "\n";
   sprintf_s(buffer, "%s : %s", cnct->user_id.c_str(), message.c_str());
+  
   for (int i = 0; i < MAX_CONNECTIONS; i++) {
     SOCKET sock = connections[i].sock;
     if (sock) {
