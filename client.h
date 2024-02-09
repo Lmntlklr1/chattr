@@ -3,6 +3,12 @@
 
 using namespace std;
 
+struct ListenThread
+{
+	SOCKET sock;
+	static DWORD WINAPI run(LPVOID lpParameter);
+};
+
 class Client {
 public:  
   int init();
@@ -14,4 +20,5 @@ private:
   string server;
   short port;
   string username;
+  ListenThread lt;
 };

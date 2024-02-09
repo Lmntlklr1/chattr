@@ -4,7 +4,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <processthreadsapi.h>
 #include <sstream>
+
+
 
 int Client::init() {
   cout << "Enter an IP address: " << endl;
@@ -18,6 +21,10 @@ int Client::init() {
     return -1;
   else
     printf("Successfully connected!\n");
+
+  lt.sock = sock;
+  // lt's lifetime is shared with the clients, however lt is not valid until now
+  CreateThread(NULL, 0, &ListenThread::run, reinterpret_cast<LPVOID>(&lt), 0, NULL);
 
   cout << "Enter a username: " <<endl;
   cin >> username;
@@ -73,4 +80,11 @@ void Client::run() {
       continue;
     }
   }
+}
+
+DWORD __stdcall ListenThread::run(LPVOID lpParameter)
+{
+    ListenThread* ltr = reinterpret_cast<ListenThread*>(lpParameter);
+    cout << ltr->sock << endl;
+    return 0;
 }
