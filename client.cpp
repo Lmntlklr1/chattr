@@ -23,10 +23,15 @@ int Client::init() {
     printf("Successfully connected!\n");
 
   lt.sock = sock;
+  if (CreatePipe(&hReadPipe, &lt.hWritePipe, NULL, 0) == 0)
+  {
+      cout << "Create Pipe Failed." << GetLastError() << endl;
+      return -1;
+  }
   // lt's lifetime is shared with the clients, however lt is not valid until now
   CreateThread(NULL, 0, &ListenThread::run, reinterpret_cast<LPVOID>(&lt), 0, NULL);
 
-  cout << "Enter a username: " <<endl;
+  cout << "Enter a username: " << endl;
   cin >> username;
 
   stringstream ss;
@@ -38,27 +43,6 @@ int Client::init() {
   return 0;
 }
 
-int Client::processMessages() {
-  int response = 0;
-  string message;
-  int count = 0;
-  do {
-    response = recvMessage(sock, &message);
-    if (response < 0) {
-      cout << "Could not get message from server\n";
-      break;
-    } else if (response > 0) {
-      cout << message <<endl;
-      count++;
-    }
-  } while (response != 0);
-  if (response < 0) {
-    return response;
-  } else {
-    return count;
-  }
-}
-
 void Client::run() {
   if (init() < 0) {
     cout << "Aborting client..";
@@ -66,7 +50,6 @@ void Client::run() {
   }
   string buffer;
   while (1) {
-    processMessages();
     printf("\r> ");
     getline(cin, buffer);
     if (buffer.length() <= 1) {
@@ -82,9 +65,37 @@ void Client::run() {
   }
 }
 
+// TODO:: Error Checking on WriteFile
+int ListenThread::processMessages() {
+  int response = 0;
+  string message;
+  int count = 0;
+  do {
+    response = recvMessage(sock, &message);
+    if (response < 0) {
+      cout << "Could not get message from server\n";
+      break;
+    } else if (response > 0) {
+      message.push_back('\n');
+      DWORD bytesWritten;
+      WriteFile(hWritePipe, message.c_str(), message.length(), &bytesWritten, NULL);
+      count++;
+    }
+  } while (response != 0);
+  if (response < 0) {
+    return response;
+  } else {
+    return count;
+  }
+}
+
 DWORD __stdcall ListenThread::run(LPVOID lpParameter)
 {
     ListenThread* ltr = reinterpret_cast<ListenThread*>(lpParameter);
-    cout << ltr->sock << endl;
+    int return_code;
+    do
+    {
+        return_code = ltr->processMessages();
+    } while (return_code > 0);
     return 0;
 }
