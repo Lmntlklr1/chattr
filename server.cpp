@@ -4,10 +4,41 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ws2tcpip.h>
+#include <cstring>
 
 int Server::init() {
   FD_ZERO(&fds);
 
+  int errorcheck = gethostname(hostname, HOSTNAME_LENGTH);
+  if (errorcheck != 0)
+  {
+      cout << "Could not gather Host Name. \n";
+      return SOCKET_ERROR;
+  }
+  addrinfo AddrInfo = { 0 , AF_INET, SOCK_STREAM, IPPROTO_TCP, 0 };
+  addrinfo* OutAddr;
+  //free structure
+  errorcheck = getaddrinfo(hostname, NULL, &AddrInfo, &OutAddr);
+  if (errorcheck != 0)
+  {
+      cout << "Could not gather Address Information.";
+      return -1;
+  }
+  char Ip[100];
+  Ip[0] = 0;
+  while (OutAddr != NULL)
+  {
+      if (OutAddr->ai_addr != NULL)
+      {
+          in_addr inAddr = reinterpret_cast<sockaddr_in*>(OutAddr->ai_addr)->sin_addr;
+          inet_ntop(OutAddr->ai_family, &inAddr, Ip, 100);
+          break;
+      }
+      OutAddr = OutAddr->ai_next;
+  }
+  cout << "Hostname: " << hostname << "\n";
+  cout << "IPv4 Address: " << Ip << "\n";
   cout << "Enter a port: ";
   cin >> port;
 
