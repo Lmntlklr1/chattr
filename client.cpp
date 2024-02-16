@@ -22,8 +22,6 @@ int Client::init() {
     printf("Successfully connected!\n");
 
   lt.sock = sock;
-  lt.consolePtr = make_shared<ConsoleStruct>();
-  consolePtr = lt.consolePtr;
   // lt's lifetime is shared with the clients, however lt is not valid until now
   CreateThread(NULL, 0, &ListenThread::run, reinterpret_cast<LPVOID>(&lt), 0, NULL);
   
