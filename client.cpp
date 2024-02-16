@@ -8,7 +8,6 @@
 #include <sstream>
 
 
-
 int Client::init() {
   cout << "Enter an IP address: " << endl;
   cin >> server;
@@ -23,14 +22,11 @@ int Client::init() {
     printf("Successfully connected!\n");
 
   lt.sock = sock;
-  if (CreatePipe(&hReadPipe, &lt.hWritePipe, NULL, 0) == 0)
-  {
-      cout << "Create Pipe Failed." << GetLastError() << endl;
-      return -1;
-  }
+  lt.consolePtr = make_shared<ConsoleStruct>();
+  consolePtr = lt.consolePtr;
   // lt's lifetime is shared with the clients, however lt is not valid until now
   CreateThread(NULL, 0, &ListenThread::run, reinterpret_cast<LPVOID>(&lt), 0, NULL);
-
+  
   cout << "Enter a username: " << endl;
   cin >> username;
 
@@ -56,6 +52,7 @@ void Client::run() {
       // Empty message. Just pull new messages again.
       continue;
     }
+    
   //  buffer[buffer.length()] = '\0';
     cout << "Sending " << buffer << endl;
     if (sendString(sock, buffer) < 0) {
@@ -78,7 +75,6 @@ int ListenThread::processMessages() {
     } else if (response > 0) {
       message.push_back('\n');
       DWORD bytesWritten;
-      WriteFile(hWritePipe, message.c_str(), message.length(), &bytesWritten, NULL);
       count++;
     }
   } while (response != 0);

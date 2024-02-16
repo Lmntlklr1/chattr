@@ -1,15 +1,27 @@
 #include "socket.h"
 #include <iostream>
+#include <mutex>
+#include <curses.h>
 
 using namespace std;
+
+#define EVENT_COUNT 2
+
+struct ConsoleStruct
+{
+	mutex mtx;
+	HANDLE hConsole;
+};
 
 struct ListenThread
 {
 	SOCKET sock;
-	HANDLE hWritePipe;
 	static DWORD WINAPI run(LPVOID lpParameter);
 	int processMessages();
+	shared_ptr<ConsoleStruct> consolePtr;
 };
+
+
 
 class Client {
 public:  
@@ -22,5 +34,5 @@ private:
   short port;
   string username;
   ListenThread lt;
-  HANDLE hReadPipe;
+  shared_ptr<ConsoleStruct> consolePtr;
 };
