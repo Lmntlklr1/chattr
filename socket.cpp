@@ -93,17 +93,17 @@ SOCKET acceptConnection(SOCKET sock, struct in_addr *client_addr) {
 
 int sendString(SOCKET sock, string str) {
   unsigned short length = str.length();
-  char *buffer = new char [2 + length];
+  char *buffer = new char [1 + length];
   if (buffer == NULL) {
     fprintf(stderr, "Unable to allocate buffer to send string. Aborting..\n");
     closesocket(sock);
     return -1;
   }
   // Store the length first
-  *(unsigned short *)buffer = htons(length);
+  *buffer = (char)(unsigned char)(length);
   // Then the string
-  memcpy(buffer + 2, str.c_str(), length);
-  int send_result = send(sock, buffer, length + 2, 0);
+  memcpy(buffer + 1, str.c_str(), length);
+  int send_result = send(sock, buffer, length + 1, 0);
   if (send_result == SOCKET_ERROR) {
       SOCKETerror("Unable to send message");
     closesocket(sock);
@@ -115,7 +115,7 @@ int sendString(SOCKET sock, string str) {
 int recvMessage(SOCKET sock, string* str) {
   unsigned short length;
   int recv_result;
-  recv_result = recv(sock, (char *)&length, 2, 0);
+  recv_result = recv(sock, (char *)&length, 1, 0);
 
   if (recv_result == SOCKET_ERROR) {
     if (WSAGetLastError() == WSAEWOULDBLOCK) {
@@ -127,12 +127,7 @@ int recvMessage(SOCKET sock, string* str) {
     return -1;
   } else if (recv_result == 0) {
     return 0; // Connection has been gracefully closed
-  } else if (recv_result < 2) {
-    fprintf(stderr, "Incomplete packet. Only %d/%d bytes received\n", recv_result, 2);
-    closesocket(sock);
-    return -1;
-  }
-  length = ntohs(length);
+  } 
   char* buffer = new char[length + 1];
   recv_result = recv(sock, buffer, length, 0);
   if (recv_result == SOCKET_ERROR) {
@@ -140,7 +135,7 @@ int recvMessage(SOCKET sock, string* str) {
     closesocket(sock);
     return -1;
   } else if (recv_result < length) {
-    fprintf(stderr, "Incomplete packet. Only %d/%d bytes received\n", recv_result + 2, length + 2);
+    fprintf(stderr, "Incomplete packet. Only %d/%d bytes received\n", recv_result + 1, length + 1);
     closesocket(sock);
     return -1;
   }

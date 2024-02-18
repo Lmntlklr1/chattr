@@ -95,7 +95,7 @@ int Server::processMessage(SOCKET skt) {
   }
   shared_ptr<Connection> cnct = GetConnectionFromSocket(skt);
   char buffer[100];
-  int ifcheck = sscanf_s(message.c_str(), "/identify %s", buffer, 100);
+  int ifcheck = sscanf_s(message.c_str(), "~register %s %s", buffer, 100);
   if (ifcheck == 1)
   {
       buffer[99] = '\0';
