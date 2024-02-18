@@ -43,6 +43,8 @@ int Server::init() {
   cin >> port;
 
   cout << "Making sock on port " << port << endl;
+  cout << "How many Users are looking to chat: ";
+  cin >> maxConnections;
   sock = makeServerSocket(port);
   if (sock < 0)
     return -1;
@@ -53,36 +55,30 @@ int Server::init() {
   return 0;
 }
 
-Connection* Server::GetConnectionFromSocket(SOCKET sock)
+shared_ptr<Connection> Server::GetConnectionFromSocket(SOCKET sock)
 {
-    for (int i = 0; i < MAX_CONNECTIONS; i++)
+    for (auto &connection : connections)
     {
-        if (connections[i].sock == sock)
+        if (connection->sock == sock)
         {
-            return &connections[i];
+            return connection;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 int Server::handleConnect(SOCKET new_socket, struct in_addr addr) {
-  int i;
-  for (i = 0; i < MAX_CONNECTIONS; i++) {
-    // sock == 0 means the connection slot is free.
-    if (connections[i].sock == 0)
-      break;
-  }
-  if (i == MAX_CONNECTIONS) {
-    sendString(new_socket, "No more room on this  sorry.");
+  if (connections.size() == maxConnections) {
+    sendString(new_socket, "No more room on this sorry.");
     closesocket(new_socket);
-    return -1;
+    return 0;
   }
   sendString(new_socket, "Welcome!");
   if (new_socket > max_fd)
     max_fd = new_socket;
   // We're accepting this connection. Add it to our list
-  connections[i].sock = new_socket;
-  connections[i].addr = addr;
+  shared_ptr<Connection> cnct = make_shared<Connection>(Connection(new_socket, addr));
+  connections.push_back(cnct);
   FD_SET(new_socket, &fds);
   return 0;
 }
@@ -97,7 +93,7 @@ int Server::processMessage(SOCKET skt) {
     // Nothing to read
     return 0;
   }
-  Connection* cnct = GetConnectionFromSocket(skt);
+  shared_ptr<Connection> cnct = GetConnectionFromSocket(skt);
   char buffer[100];
   int ifcheck = sscanf_s(message.c_str(), "/identify %s", buffer, 100);
   if (ifcheck == 1)
@@ -115,8 +111,8 @@ int Server::processMessage(SOCKET skt) {
   cout << "Recieved " <<  message << "\n";
   sprintf_s(buffer, "%s : %s", cnct->user_id.c_str(), message.c_str());
   
-  for (int i = 0; i < MAX_CONNECTIONS; i++) {
-    SOCKET sock = connections[i].sock;
+  for (auto& connection : connections) {
+    SOCKET sock = connection->sock;
     if (sock) {
       sendString(sock, buffer);
     }

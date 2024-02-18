@@ -1,11 +1,10 @@
 #include "socket.h"
 #include <iostream>
+#include <vector>
 
 using namespace std;
 
 // Maximum users
-#define MAX_CONNECTIONS 3
-#define MAX_USERS 100
 #define MAX_ROOMS 10
 #define MAX_USERS_PER_ROOM 10
 #define HOSTNAME_LENGTH 100
@@ -17,6 +16,7 @@ struct Connection {
   SOCKET sock;
   struct in_addr addr;
   string user_id;
+  Connection(SOCKET sock, in_addr addr) : sock(sock), addr(addr), user_id("") {}
 };
 
 /* class User { */
@@ -31,15 +31,15 @@ public:
   int handleConnect(SOCKET new_socket, struct in_addr addr);
   int processMessage(SOCKET sock);
   void run();
-  Connection* GetConnectionFromSocket(SOCKET sock);
+  shared_ptr<Connection> GetConnectionFromSocket(SOCKET sock);
 private:
   SOCKET sock;
   short port;
   fd_set fds;
   SOCKET max_fd;
-  Connection connections[MAX_CONNECTIONS];
+  int maxConnections;
+  vector<shared_ptr<Connection>> connections;
   char hostname[HOSTNAME_LENGTH];
-
   /* User users[MAX_USERS]; */
 };
 
