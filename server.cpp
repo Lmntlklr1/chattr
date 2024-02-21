@@ -17,38 +17,17 @@ int Server::init() {
   if (errorcheck != 0)
   {
       cout << "Could not gather Host Name. \n";
-      return SOCKET_ERROR;
-  }
-  addrinfo AddrInfo = { 0 , AF_INET, SOCK_STREAM, IPPROTO_TCP, 0 };
-  addrinfo* OutAddr;
-  //free structure
-  errorcheck = getaddrinfo(hostname, NULL, &AddrInfo, &OutAddr);
-  if (errorcheck != 0)
-  {
-      cout << "Could not gather Address Information.";
       return -1;
   }
-
-  char Ip[100];
-  Ip[0] = 0;
-  while (OutAddr != NULL)
-  {
-      if (OutAddr->ai_addr != NULL)
-      {
-          in_addr inAddr = reinterpret_cast<sockaddr_in*>(OutAddr->ai_addr)->sin_addr;
-          inet_ntop(OutAddr->ai_family, &inAddr, Ip, 100);
-          break;
-      }
-      OutAddr = OutAddr->ai_next;
-  }
   cout << "Hostname: " << hostname << "\n";
-  cout << "IPv4 Address: " << Ip << "\n";
+  cout << "IPv4 Address: " << GetIPAddress(AF_INET, SOCK_STREAM, IPPROTO_TCP) << "\n";
+  cout << "IPv6 Address: " << GetIPAddress(AF_INET6, SOCK_STREAM, IPPROTO_TCP) << "\n";
   cout << "Enter a port: ";
   cin >> port;
 
   //prompt for commandChar
-  commandChar = '~';
-
+  cout << "Command character: ";
+  cin >> commandChar;
   cout << "Making sock on port " << port << endl;
   cout << "How many Users are looking to chat: ";
   cin >> maxConnections;
@@ -86,7 +65,9 @@ int Server::handleConnect(SOCKET new_socket, struct in_addr addr) {
   // We're accepting this connection. Add it to our list
   shared_ptr<Connection> cnct = make_shared<Connection>(Connection(new_socket, addr));
   connections.push_back(cnct);
-  if (sendMessage(cnct, "Welcome!") < 0)
+  ostringstream message;
+  message << "Welcome, the default character for issueing commands is " << commandChar << ".\n" << "Use the /help command to find out any other commands.\n";
+  if (sendMessage(cnct, message.str()) < 0)
   {
       return -1;
   }
@@ -132,19 +113,22 @@ int Server::processMessage(SOCKET skt) {
       messageStream >> commandWord;
       if (commandWord == "help")
       {
-          sendString(skt, "~register to register a username and password before chatting");
+          ostringstream helpMessage;
+          helpMessage << "Here are all the available commands:\n\t"
+              << commandChar << "register <username <password> to register a username and password before chatting\n\t"
+              << commandChar << "help to find all available commands\n";
+          sendMessage(cnct, helpMessage.str());
       }
       else if (commandWord == "register")
       {
           string username;
           string password;
-          int i = 1;
           messageStream >> username >> password;
           Register(cnct, username, password);
       }
       else
       {
-          sendString(skt, "Command not recognized");
+          sendMessage(cnct, "Command not recognized");
       }
   }
   char buffer[100];
@@ -162,11 +146,16 @@ int Server::processMessage(SOCKET skt) {
 
 int Server::Register(shared_ptr<Connection> cnct, string username, string pass) {
     if (cnct->user_id != "") {
-        sendString(cnct->sock, "You are already logged in.");
+        sendMessage(cnct, "You are already logged in.");
+        return 0;
+    }
+    if (username == "" || pass == "")
+    {
+        sendMessage(cnct, "No username or password was provided.");
         return 0;
     }
     if (users.find(username) != users.end()) {
-        sendString(cnct->sock, "Username has already already taken.");
+        sendMessage(cnct, "Username has already already taken.");
         return 0;
     }
     cnct->user_id = username;
@@ -174,9 +163,7 @@ int Server::Register(shared_ptr<Connection> cnct, string username, string pass) 
     ostringstream os;
     os << "Welcome " << username << ".\n"
         << "You are now registered.";
-    string registerStr;
-    os.str(registerStr);
-    sendString(cnct->sock, registerStr);
+    sendMessage(cnct, os.str());
     return 0;
 }
 
@@ -228,6 +215,42 @@ void Server::RemoveConnection(shared_ptr<Connection> cnct)
     {
         connections.erase(it);
     }
+}
+
+string Server::GetIPAddress(int family, int stream, int protocol)
+{
+    addrinfo AddrInfo = { 0 , family, stream, protocol, 0 };
+    addrinfo* OutAddr;
+    //free structure
+    int errorcheck = getaddrinfo(hostname, NULL, &AddrInfo, &OutAddr);
+    if (errorcheck != 0)
+    {
+        cout << "Could not gather Address Information.";
+        return "";
+    }
+
+    char Ip[200];
+    Ip[0] = 0;
+    while (OutAddr != NULL)
+    {
+        if (OutAddr->ai_addr != NULL)
+        {
+            if (family == AF_INET)
+            {
+                in_addr inAddr = reinterpret_cast<sockaddr_in*>(OutAddr->ai_addr)->sin_addr;
+                inet_ntop(OutAddr->ai_family, &inAddr, Ip, 200);
+                break;
+            }
+            else if (family == AF_INET6)
+            {
+                in_addr6 inAddr = reinterpret_cast<sockaddr_in6*>(OutAddr->ai_addr)->sin6_addr;
+                inet_ntop(OutAddr->ai_family, &inAddr, Ip, 200);
+                break;
+            }
+        }
+        OutAddr = OutAddr->ai_next;
+    }
+    return Ip;
 }
 
 void Server::run() {

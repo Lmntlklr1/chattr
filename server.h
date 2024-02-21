@@ -39,7 +39,7 @@ public:
   int sendMessage(shared_ptr<Connection> cnct, string str);
   int recvMessage(shared_ptr<Connection> cnct, string* buffer);
   void RemoveConnection(shared_ptr<Connection> cnct);
-
+  string GetIPAddress(int family, int stream, int protocol);
 private:
   SOCKET sock;
   short port;
