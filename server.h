@@ -18,6 +18,8 @@ struct Connection {
   struct in_addr addr;
   string user_id;
   Connection(SOCKET sock, in_addr addr) : sock(sock), addr(addr), user_id("") {}
+  ~Connection();
+  void Close();
 };
 
 struct User {
@@ -34,6 +36,8 @@ public:
   void run();
   shared_ptr<Connection> GetConnectionFromSocket(SOCKET sock);
   int Register(shared_ptr<Connection> cnct, string username, string pass);
+  int sendMessage(shared_ptr<Connection> cnct, string str);
+  int recvMessage(shared_ptr<Connection> cnct, string* buffer);
 private:
   SOCKET sock;
   short port;

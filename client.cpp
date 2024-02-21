@@ -66,7 +66,7 @@ int ListenThread::processMessages() {
   string message;
   int count = 0;
   do {
-    response = recvMessage(sock, &message);
+    response = recvString(sock, &message);
     if (response < 0) {
       cout << "Could not get message from server\n";
       break;

@@ -7,6 +7,8 @@
 #include <ws2tcpip.h>
 #include <cstring>
 #include <sstream>
+#include "socket.h"
+#include <algorithm>
 
 int Server::init() {
   FD_ZERO(&fds);
@@ -78,19 +80,22 @@ int Server::handleConnect(SOCKET new_socket, struct in_addr addr) {
     closesocket(new_socket);
     return 0;
   }
-  sendString(new_socket, "Welcome!");
   if (new_socket > max_fd)
     max_fd = new_socket;
+  FD_SET(new_socket, &fds);
   // We're accepting this connection. Add it to our list
   shared_ptr<Connection> cnct = make_shared<Connection>(Connection(new_socket, addr));
   connections.push_back(cnct);
-  FD_SET(new_socket, &fds);
+  if (sendMessage(cnct, "Welcome!") < 0)
+  {
+      return -1;
+  }
   return 0;
 }
 
 int Server::processMessage(SOCKET skt) {
   string message;
-  int recv_result = recvMessage(skt, &message);
+  int recv_result = recvString(skt, &message);
   if (recv_result < 0) {
     cout << "Error " << recv_result << "\n";
     return -1;
@@ -174,6 +179,56 @@ int Server::Register(shared_ptr<Connection> cnct, string username, string pass) 
     return 0;
 }
 
+int Server::sendMessage(shared_ptr<Connection> cnct, string str)
+{
+    RETURNCODE code = sendString(cnct->sock, str);
+    if (code == SUCCESS)
+    {
+        return 0;
+    }
+    else
+    {
+        cout << "Send failed, failed with code " << code << "\n";
+        if (code == SHUTDOWN)
+        {
+            shutdown(cnct->sock, SD_BOTH);
+            cout << "Send failed, shutting down socket\n";
+        }
+        cnct->Close();
+        auto it = find(connections.begin(), connections.end(), cnct);
+        if (it != connections.end())
+        {
+            connections.erase(it);
+        }
+        return -1;
+    }
+}
+
+int Server::recvMessage(shared_ptr<Connection> cnct, string* buffer)
+{
+    RETURNCODE code = recvString(cnct->sock, buffer);
+    if (code == SUCCESS)
+    {
+        return 0;
+    }
+    else
+    {
+        cout << "Recieve failed, failed with code " << code << "\n";
+        if (code == SHUTDOWN)
+        {
+            shutdown(cnct->sock, SD_BOTH);
+            cout << "Recieve failed, shutting down socket\n";
+        }
+        cnct->Close();
+        auto it = find(connections.begin(), connections.end(), cnct);
+        if (it != connections.end())
+        {
+            connections.erase(it);
+        }
+        return -1;
+    }
+}
+
 void Server::run() {
   if (init() < 0)
     return;
@@ -195,10 +250,13 @@ void Server::run() {
           // New connection
           struct in_addr addr;
           SOCKET new_socket = acceptConnection(sock, &addr);
-          if (new_socket < 0)
-            return;
+          if (new_socket == INVALID_SOCKET)
+          {
+              cout << "Accept connection failed \n";
+              continue;
+          }
           if (handleConnect(new_socket, addr) < 0) {
-            return;
+             return;
           }
         } else {
           if (processMessage(i) < 0)
@@ -207,25 +265,21 @@ void Server::run() {
       }
     }
   }
-
-  struct in_addr addr = {0};
-  int connected_socket = acceptConnection(sock, &addr);
-  if (connected_socket < 0)
-    cout << "Errror";
-  cout << "Accepting connection on " << connected_socket << endl;
-  string buffer;
-  int count = recvMessage(connected_socket, &buffer);
-  if (count < 0) {
-    cout << "Aborting server.\n";
-    return;
-  } else if (count > 0) {
-    cout << buffer << endl;
-  } else {
-    cout << "Recieved empty message.\n";
-  }
-
-  return;
-
 }
 
+Connection::~Connection()
+{
+    Close();
+}
 
+void Connection::Close()
+{
+    if (sock != INVALID_SOCKET)
+    {
+        if (closesocket(sock) == SOCKET_ERROR)
+        {
+            SocketError("Error, attempting to close socket");
+        }
+        sock = INVALID_SOCKET;
+    }
+}
