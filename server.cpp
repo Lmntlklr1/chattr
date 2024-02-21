@@ -94,16 +94,35 @@ int Server::handleConnect(SOCKET new_socket, struct in_addr addr) {
 }
 
 int Server::processMessage(SOCKET skt) {
+  shared_ptr<Connection> cnct = GetConnectionFromSocket(skt);
   string message;
   int recv_result = recvString(skt, &message);
-  if (recv_result < 0) {
+  if (recv_result != 0) {
     cout << "Error " << recv_result << "\n";
-    return -1;
-  } else if (recv_result == 0) {
+    if (recv_result == SHUTDOWN)
+    {
+        closesocket(cnct->sock);
+        cout << "Shutdown socket trying to process message: SHUTDOWN\n";
+        return 0;
+    }
+    if (recv_result == DISCONNECT)
+    {
+        shutdown(cnct->sock, SD_BOTH);
+        RemoveConnection(cnct);
+        cout << "Disconnected trying to process message: DISCONNECT\n";
+        return 0;
+    }
+    else
+    {
+        shutdown(cnct->sock, SD_BOTH);
+        RemoveConnection(cnct);
+        cout << "Encountered error trying to process message: "  << recv_result << "\n";
+        return 0;
+    }
+  } else if (message.length() == 0) {
     // Nothing to read
     return 0;
   }
-  shared_ptr<Connection> cnct = GetConnectionFromSocket(skt);
   if (message[0] == commandChar)
   {
       string commandWord;
@@ -129,26 +148,7 @@ int Server::processMessage(SOCKET skt) {
       }
   }
   char buffer[100];
-  int ifcheck = sscanf_s(message.c_str(), "register %s %s", buffer, 100);
-  if (ifcheck == 1)
-  {
-      buffer[99] = '\0';
-      cnct->user_id = buffer;
-  }
-  ifcheck = sscanf_s(message.c_str(), "disconnect %s", buffer, 100);
-  if (ifcheck == 1)
-  {
-      buffer[99] = '\0';
-      cnct->user_id = buffer;
-      closesocket(cnct->sock);
-  }
-  ifcheck = sscanf_s(message.c_str(), "help", buffer, 100);
-  if (ifcheck == 1)
-  {
-      buffer[99] = '\0';
-      cnct->user_id = buffer;
-  }
-  cout << "Recieved " <<  message << "\n";
+   cout << "Recieved " <<  message << "\n";
   sprintf_s(buffer, "%s : %s", cnct->user_id.c_str(), message.c_str());
   
   for (auto& connection : connections) {
@@ -169,6 +169,7 @@ int Server::Register(shared_ptr<Connection> cnct, string username, string pass) 
         sendString(cnct->sock, "Username has already already taken.");
         return 0;
     }
+    cnct->user_id = username;
     users[username] = make_shared<User>(User(username, pass));
     ostringstream os;
     os << "Welcome " << username << ".\n"
@@ -194,12 +195,7 @@ int Server::sendMessage(shared_ptr<Connection> cnct, string str)
             shutdown(cnct->sock, SD_BOTH);
             cout << "Send failed, shutting down socket\n";
         }
-        cnct->Close();
-        auto it = find(connections.begin(), connections.end(), cnct);
-        if (it != connections.end())
-        {
-            connections.erase(it);
-        }
+        RemoveConnection(cnct);
         return -1;
     }
 }
@@ -219,13 +215,18 @@ int Server::recvMessage(shared_ptr<Connection> cnct, string* buffer)
             shutdown(cnct->sock, SD_BOTH);
             cout << "Recieve failed, shutting down socket\n";
         }
-        cnct->Close();
-        auto it = find(connections.begin(), connections.end(), cnct);
-        if (it != connections.end())
-        {
-            connections.erase(it);
-        }
+        RemoveConnection(cnct);
         return -1;
+    }
+}
+
+void Server::RemoveConnection(shared_ptr<Connection> cnct)
+{
+    cnct->Close();
+    auto it = find(connections.begin(), connections.end(), cnct);
+    if (it != connections.end())
+    {
+        connections.erase(it);
     }
 }
 
@@ -267,10 +268,10 @@ void Server::run() {
   }
 }
 
-Connection::~Connection()
-{
-    Close();
-}
+//Connection::~Connection()
+//{
+//    Close();
+//}
 
 void Connection::Close()
 {
