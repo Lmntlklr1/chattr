@@ -113,15 +113,17 @@ int sendString(SOCKET sock, string str) {
 }
 
 int recvMessage(SOCKET sock, string* str) {
-  unsigned short length;
+  unsigned char length;
   int recv_result;
   recv_result = recv(sock, (char *)&length, 1, 0);
 
   if (recv_result == SOCKET_ERROR) {
-    if (WSAGetLastError() == WSAEWOULDBLOCK) {
+      int error = WSAGetLastError();
+    if (error == WSAEWOULDBLOCK) {
       // Not a real error code. Ignore
       return 0;
     }
+
     SOCKETerror("Error: Unable to recv message length");
     closesocket(sock);
     return -1;

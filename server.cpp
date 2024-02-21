@@ -6,6 +6,7 @@
 #include <string.h>
 #include <ws2tcpip.h>
 #include <cstring>
+#include <sstream>
 
 int Server::init() {
   FD_ZERO(&fds);
@@ -25,6 +26,7 @@ int Server::init() {
       cout << "Could not gather Address Information.";
       return -1;
   }
+
   char Ip[100];
   Ip[0] = 0;
   while (OutAddr != NULL)
@@ -41,6 +43,9 @@ int Server::init() {
   cout << "IPv4 Address: " << Ip << "\n";
   cout << "Enter a port: ";
   cin >> port;
+
+  //prompt for commandChar
+  commandChar = '~';
 
   cout << "Making sock on port " << port << endl;
   cout << "How many Users are looking to chat: ";
@@ -94,19 +99,49 @@ int Server::processMessage(SOCKET skt) {
     return 0;
   }
   shared_ptr<Connection> cnct = GetConnectionFromSocket(skt);
+  if (message[0] == commandChar)
+  {
+      string commandWord;
+      istringstream messageStream(message);
+      // skip command char
+      messageStream.get();
+      messageStream >> commandWord;
+      if (commandWord == "help")
+      {
+          sendString(skt, "~register to register a username and password before chatting");
+      }
+      else if (commandWord == "register")
+      {
+          string username;
+          string password;
+          int i = 1;
+          messageStream >> username >> password;
+          Register(cnct, username, password);
+      }
+      else
+      {
+          sendString(skt, "Command not recognized");
+      }
+  }
   char buffer[100];
-  int ifcheck = sscanf_s(message.c_str(), "~register %s %s", buffer, 100);
+  int ifcheck = sscanf_s(message.c_str(), "register %s %s", buffer, 100);
   if (ifcheck == 1)
   {
       buffer[99] = '\0';
       cnct->user_id = buffer;
   }
-  ifcheck = sscanf_s(message.c_str(), "/disconnect %s", buffer, 100);
+  ifcheck = sscanf_s(message.c_str(), "disconnect %s", buffer, 100);
   if (ifcheck == 1)
   {
       buffer[99] = '\0';
       cnct->user_id = buffer;
       closesocket(cnct->sock);
+  }
+  ifcheck = sscanf_s(message.c_str(), "help", buffer, 100);
+  if (ifcheck == 1)
+  {
+      buffer[99] = '\0';
+      cnct->user_id = buffer;
   }
   cout << "Recieved " <<  message << "\n";
   sprintf_s(buffer, "%s : %s", cnct->user_id.c_str(), message.c_str());
@@ -118,6 +153,25 @@ int Server::processMessage(SOCKET skt) {
     }
   }
   return 1;
+}
+
+int Server::Register(shared_ptr<Connection> cnct, string username, string pass) {
+    if (cnct->user_id != "") {
+        sendString(cnct->sock, "You are already logged in.");
+        return 0;
+    }
+    if (users.find(username) != users.end()) {
+        sendString(cnct->sock, "Username has already already taken.");
+        return 0;
+    }
+    users[username] = make_shared<User>(User(username, pass));
+    ostringstream os;
+    os << "Welcome " << username << ".\n"
+        << "You are now registered.";
+    string registerStr;
+    os.str(registerStr);
+    sendString(cnct->sock, registerStr);
+    return 0;
 }
 
 void Server::run() {
@@ -173,3 +227,5 @@ void Server::run() {
   return;
 
 }
+
+

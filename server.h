@@ -1,6 +1,7 @@
 #include "socket.h"
 #include <iostream>
 #include <vector>
+#include <map>
 
 using namespace std;
 
@@ -19,11 +20,11 @@ struct Connection {
   Connection(SOCKET sock, in_addr addr) : sock(sock), addr(addr), user_id("") {}
 };
 
-/* class User { */
-/*   string username; */
-/*   string password; */
-/*   Connection *connection; */
-/* }; */
+struct User {
+	string username;
+	string password;
+	User(string username, string password) : username(username), password(password) {}
+ };
 
 class Server {
 public:
@@ -32,6 +33,7 @@ public:
   int processMessage(SOCKET sock);
   void run();
   shared_ptr<Connection> GetConnectionFromSocket(SOCKET sock);
+  int Register(shared_ptr<Connection> cnct, string username, string pass);
 private:
   SOCKET sock;
   short port;
@@ -40,6 +42,8 @@ private:
   int maxConnections;
   vector<shared_ptr<Connection>> connections;
   char hostname[HOSTNAME_LENGTH];
+  char commandChar;
+  map<string, shared_ptr<User>> users;
   /* User users[MAX_USERS]; */
 };
 
