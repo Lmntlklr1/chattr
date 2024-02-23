@@ -24,15 +24,6 @@ int Client::init() {
   lt.sock = sock;
   // lt's lifetime is shared with the clients, however lt is not valid until now
   CreateThread(NULL, 0, &ListenThread::run, reinterpret_cast<LPVOID>(&lt), 0, NULL);
-  
-  cout << "Enter a username: " << endl;
-  cin >> username;
-
-  stringstream ss;
-  ss << "/identify " <<username;
-  if (sendString(sock, ss.str()) < 0) {
-    return -1;
-  }
 
   return 0;
 }
@@ -72,7 +63,6 @@ int ListenThread::processMessages() {
       break;
     } else if (response > 0) {
       message.push_back('\n');
-      DWORD bytesWritten;
       count++;
     }
   } while (response != 0);

@@ -92,8 +92,13 @@ SOCKET acceptConnection(SOCKET sock, struct in_addr *client_addr) {
 }
 
 RETURNCODE sendString(SOCKET sock, string str) {
-  unsigned short length = str.length();
-  char *buffer = new char [1 + length];
+  if (str.length() != (unsigned char)str.length())
+  {
+      cout << "String length is too long to send.\n";
+      return MESSAGE_ERROR;
+  }
+  unsigned char length = (unsigned char)str.length();
+  char *buffer = new char [1 + (size_t)length];
   if (buffer == NULL) {
     fprintf(stderr, "Unable to allocate buffer to send string. Aborting..\n");
     closesocket(sock);
@@ -145,7 +150,7 @@ RETURNCODE recvString(SOCKET sock, string* str) {
   } else if (recv_result == 0) {
     return DISCONNECT; // Connection has been gracefully closed
   } 
-  char* buffer = new char[length + 1];
+  char* buffer = new char[(size_t)length + 1];
   recv_result = recv(sock, buffer, length, 0);
   if (recv_result == SOCKET_ERROR) {
     SocketError("Unable to recv message body");

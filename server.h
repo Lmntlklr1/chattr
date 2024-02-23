@@ -10,7 +10,6 @@ using namespace std;
 #define MAX_USERS_PER_ROOM 10
 #define HOSTNAME_LENGTH 100
 
-class User;
 class Server;
 
 struct Connection {
@@ -40,6 +39,11 @@ public:
   int recvMessage(shared_ptr<Connection> cnct, string* buffer);
   void RemoveConnection(shared_ptr<Connection> cnct);
   string GetIPAddress(int family, int stream, int protocol);
+  int Login(shared_ptr<Connection>cnct, string username, string pass);
+  int Logout(shared_ptr<Connection> cnct);
+  int SendDirectMessage(shared_ptr<Connection> cnct, string username, string str);
+  int GetLog(shared_ptr<Connection> cnct);
+  int GetList(shared_ptr<Connection> cnct);
 private:
   SOCKET sock;
   short port;

@@ -126,21 +126,48 @@ int Server::processMessage(SOCKET skt) {
           messageStream >> username >> password;
           Register(cnct, username, password);
       }
+      else if (commandWord == "login")
+      {
+          string username;
+          string password;
+          messageStream >> username >> password;
+          Login(cnct, username, password);
+      }
+      else if (commandWord == "logout")
+      {
+          Logout(cnct);
+      }
+      else if (commandWord == "send")
+      {
+
+      }
+      else if (commandWord == "getlog")
+      {
+
+      }
+      else if (commandWord == "getlist")
+      {
+
+      }
       else
       {
           sendMessage(cnct, "Command not recognized");
       }
   }
-  char buffer[100];
-   cout << "Recieved " <<  message << "\n";
-  sprintf_s(buffer, "%s : %s", cnct->user_id.c_str(), message.c_str());
-  
-  for (auto& connection : connections) {
-    SOCKET sock = connection->sock;
-    if (sock) {
-      sendString(sock, buffer);
-    }
+  else
+  {
+      char buffer[100];
+      cout << "Recieved " << message << "\n";
+      sprintf_s(buffer, "%s : %s", cnct->user_id.c_str(), message.c_str());
+
+      for (auto& connection : connections) {
+          SOCKET sock = connection->sock;
+          if (sock) {
+              sendString(sock, buffer);
+          }
+      }
   }
+ 
   return 1;
 }
 
@@ -253,13 +280,73 @@ string Server::GetIPAddress(int family, int stream, int protocol)
     return Ip;
 }
 
+int Server::Login(shared_ptr<Connection> cnct, string username, string pass)
+{
+    if (cnct->user_id != "") {
+        sendMessage(cnct, "You are already logged in.");
+        return 0;
+    }
+    if (username == "" || pass == "")
+    {
+        sendMessage(cnct, "No username or password was provided.");
+        return 0;
+    }
+    auto user = users.find(username);
+    if (user == users.end()) {
+        sendMessage(cnct, "Username has not been found.");
+        return 0;
+    }
+    if ((*user).second->password == pass)
+    {
+        cnct->user_id = username;
+        ostringstream os;
+        os << "Welcome " << username << ".\n"
+            << "You are now logged back in.";
+        sendMessage(cnct, os.str());
+    }
+    else
+    {
+        ostringstream os;
+        os << "Password is not correct, please try again.";
+        sendMessage(cnct, os.str());
+    }
+    return 0;
+}
+
+int Server::Logout(shared_ptr<Connection> cnct)
+{
+    if (cnct->user_id == "") {
+        sendMessage(cnct, "You are not logged in.");
+        return 0;
+    }
+    cnct->user_id = "";
+    sendMessage(cnct, "You have been successfully logged out.");
+    return 0;
+
+}
+
+int Server::SendDirectMessage(shared_ptr<Connection> cnct, string username, string str)
+{
+    return 0;
+}
+
+int Server::GetLog(shared_ptr<Connection> cnct)
+{
+    return 0;
+}
+
+int Server::GetList(shared_ptr<Connection> cnct)
+{
+    return 0;
+}
+
 void Server::run() {
   if (init() < 0)
     return;
 
   while (1) {
     fd_set read_fds = fds;
-    int select_result = select(max_fd + 1, &read_fds, NULL, NULL, NULL);
+    int select_result = select((int)max_fd + 1, &read_fds, NULL, NULL, NULL);
     if (select_result < 0) {
       cout << "Error select failed";
       return;
