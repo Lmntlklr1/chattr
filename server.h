@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include <fstream>
 
 using namespace std;
 
@@ -42,8 +43,11 @@ public:
   int Login(shared_ptr<Connection>cnct, string username, string pass);
   int Logout(shared_ptr<Connection> cnct);
   int SendDirectMessage(shared_ptr<Connection> cnct, string username, string str);
-  int GetLog(shared_ptr<Connection> cnct);
+  int GetLog(shared_ptr<Connection> cnct, string fileType);
   int GetList(shared_ptr<Connection> cnct);
+  int Disconnect(shared_ptr<Connection> cnct);
+  int ProcessCommand(string message, shared_ptr<Connection> cnct);
+  int BroadcastToServer();
 private:
   SOCKET sock;
   short port;
@@ -54,6 +58,8 @@ private:
   char hostname[HOSTNAME_LENGTH];
   char commandChar;
   map<string, shared_ptr<User>> users;
+  fstream cmdFile;
+  fstream publicFile;
   /* User users[MAX_USERS]; */
 };
 

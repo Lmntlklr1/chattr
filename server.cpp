@@ -28,6 +28,8 @@ int Server::init() {
   //prompt for commandChar
   cout << "Command character: ";
   cin >> commandChar;
+  publicFile.open("Convo-Log.txt", fstream::in | fstream::out | fstream::app | fstream::ate);
+  cmdFile.open("Command-Log.txt", fstream::in | fstream::out | fstream::app | fstream::ate);
   cout << "Making sock on port " << port << endl;
   cout << "How many Users are looking to chat: ";
   cin >> maxConnections;
@@ -106,66 +108,32 @@ int Server::processMessage(SOCKET skt) {
   }
   if (message[0] == commandChar)
   {
-      string commandWord;
-      istringstream messageStream(message);
-      // skip command char
-      messageStream.get();
-      messageStream >> commandWord;
-      if (commandWord == "help")
-      {
-          ostringstream helpMessage;
-          helpMessage << "Here are all the available commands:\n\t"
-              << commandChar << "register <username <password> to register a username and password before chatting\n\t"
-              << commandChar << "help to find all available commands\n";
-          sendMessage(cnct, helpMessage.str());
-      }
-      else if (commandWord == "register")
-      {
-          string username;
-          string password;
-          messageStream >> username >> password;
-          Register(cnct, username, password);
-      }
-      else if (commandWord == "login")
-      {
-          string username;
-          string password;
-          messageStream >> username >> password;
-          Login(cnct, username, password);
-      }
-      else if (commandWord == "logout")
-      {
-          Logout(cnct);
-      }
-      else if (commandWord == "send")
-      {
-
-      }
-      else if (commandWord == "getlog")
-      {
-
-      }
-      else if (commandWord == "getlist")
-      {
-
-      }
-      else
-      {
-          sendMessage(cnct, "Command not recognized");
-      }
+      ProcessCommand(message, cnct);
   }
   else
   {
       char buffer[100];
       cout << "Recieved " << message << "\n";
+      if (cnct->user_id == "")
+      {
+          sendMessage(cnct, "You are not logged in, please /register");
+          return 0;
+      }
       sprintf_s(buffer, "%s : %s", cnct->user_id.c_str(), message.c_str());
 
       for (auto& connection : connections) {
           SOCKET sock = connection->sock;
           if (sock) {
+              if (connection == cnct)
+              {
+                  continue;
+              }
               sendString(sock, buffer);
           }
       }
+      ostringstream os;
+      os << cnct->user_id << ": " << message << "\n";
+      publicFile.write(os.str().c_str(), os.str().length());
   }
  
   return 1;
@@ -196,22 +164,25 @@ int Server::Register(shared_ptr<Connection> cnct, string username, string pass) 
 
 int Server::sendMessage(shared_ptr<Connection> cnct, string str)
 {
-    RETURNCODE code = sendString(cnct->sock, str);
-    if (code == SUCCESS)
+    string line;
+    istringstream is(str);
+    while (!is.eof())
     {
-        return 0;
-    }
-    else
-    {
-        cout << "Send failed, failed with code " << code << "\n";
-        if (code == SHUTDOWN)
+        getline(is, line);
+        RETURNCODE code = sendString(cnct->sock, line);
+        if (code != SUCCESS)
         {
-            shutdown(cnct->sock, SD_BOTH);
-            cout << "Send failed, shutting down socket\n";
+            cout << "Send failed, failed with code " << code << "\n";
+            if (code == SHUTDOWN)
+            {
+                shutdown(cnct->sock, SD_BOTH);
+                cout << "Send failed, shutting down socket\n";
+            }
+            RemoveConnection(cnct);
+            return -1;
         }
-        RemoveConnection(cnct);
-        return -1;
     }
+    return 0;    
 }
 
 int Server::recvMessage(shared_ptr<Connection> cnct, string* buffer)
@@ -321,22 +292,144 @@ int Server::Logout(shared_ptr<Connection> cnct)
     }
     cnct->user_id = "";
     sendMessage(cnct, "You have been successfully logged out.");
+    Disconnect(cnct);
     return 0;
-
 }
 
 int Server::SendDirectMessage(shared_ptr<Connection> cnct, string username, string str)
 {
+    ostringstream os;
+    os << cnct->user_id << ":" << str;
+    if (cnct->user_id != "")
+    {
+        for (int i = 0; i < connections.size(); i++)
+        {
+            if (connections.at(i).get()->user_id == username)
+            {
+                sendMessage(connections.at(i), os.str());
+                return 0;
+            }
+        }
+    }
+    else
+    {
+        cout << "User is not logged in\n";
+        sendMessage(cnct, "You need to be logged in to user this function");
+        return 0;
+    }
+    sendMessage(cnct, "User not currently logged in");
     return 0;
 }
 
-int Server::GetLog(shared_ptr<Connection> cnct)
+int Server::GetLog(shared_ptr<Connection> cnct, string fileType)
 {
+    transform(fileType.begin(), fileType.end(), fileType.begin(), __ascii_tolower);
+    if (fileType == "public")
+    {
+        ifstream::pos_type fileSize = publicFile.tellg();
+        if (fileSize == ifstream::pos_type(-1))
+        {
+            return -1;
+        }
+        publicFile.seekg(0, ios::beg);
+
+        vector<char> bytes(fileSize);
+        publicFile.read(&bytes[0], fileSize);
+
+        sendMessage(cnct, string(&bytes[0], fileSize));
+    }
+    else if (fileType == "private")
+    {
+        ifstream::pos_type fileSize = cmdFile.tellg();
+        if (fileSize == ifstream::pos_type(-1))
+        {
+            return -1;
+        }
+        cmdFile.seekg(0, ios::beg);
+
+        vector<char> bytes(fileSize);
+        cmdFile.read(&bytes[0], fileSize);
+
+        sendMessage(cnct, string(&bytes[0], fileSize));
+    }
     return 0;
 }
 
 int Server::GetList(shared_ptr<Connection> cnct)
 {
+    ostringstream os;
+    os << "Current Online users:\n";
+    for (int i = 0; i < connections.size(); i++)
+        os << "\t" << (connections.at(i)).get()->user_id << "\n";
+    sendMessage(cnct, os.str());
+    return 0;
+}
+
+
+
+int Server::ProcessCommand(string message, shared_ptr<Connection> cnct)
+{
+    string commandWord;
+    istringstream messageStream(message);
+    // skip command char
+    messageStream.get();
+    messageStream >> commandWord;
+    if (commandWord == "help")
+    {
+        ostringstream helpMessage;
+        helpMessage << "Here are all the available commands:\n\t"
+            << commandChar << "register <username <password> to register a username and password before chatting\n\t"
+            << commandChar << "help to find all available commands\n\t"
+            << commandChar << "login to get back into having your converstations you were previously\n\t"
+            << commandChar << "logout to logout of the server\n\t"
+            << commandChar << "send <username> <the message to send> to direct message someone without having the other people on the server know what are messaging\n\t"
+            << commandChar << "getlog <public or private> to grab the messaging log of the client\n\t"
+            << commandChar << "getlist to get a list of users who are currently connected\n";
+        sendMessage(cnct, helpMessage.str());
+    }
+    else if (commandWord == "register")
+    {
+        string username;
+        string password;
+        messageStream >> username >> password;
+        Register(cnct, username, password);
+    }
+    else if (commandWord == "login")
+    {
+        string username;
+        string password;
+        messageStream >> username >> password;
+        Login(cnct, username, password);
+    }
+    else if (commandWord == "logout")
+    {
+        Logout(cnct);
+    }
+    else if (commandWord == "send")
+    {
+        string username;
+        string str;
+        messageStream >> username;
+        getline(messageStream, str, '\0');
+        SendDirectMessage(cnct, username, str);
+    }
+    else if (commandWord == "getlog")
+    {
+        string fileType;
+        messageStream >> fileType;
+        GetLog(cnct, fileType);
+    }
+    else if (commandWord == "getlist")
+    {
+        GetList(cnct);
+    }
+    else
+    {
+        sendMessage(cnct, "Command not recognized");
+    }
+    ostringstream finalMessage(message);
+    finalMessage << message << "\n";
+    cmdFile.write(finalMessage.str().c_str(), finalMessage.str().length());
     return 0;
 }
 
@@ -344,37 +437,50 @@ void Server::run() {
   if (init() < 0)
     return;
 
-  while (1) {
-    fd_set read_fds = fds;
-    int select_result = select((int)max_fd + 1, &read_fds, NULL, NULL, NULL);
-    if (select_result < 0) {
-      cout << "Error select failed";
-      return;
-    } else if (select_result == 0) {
-      continue;
-    }
-    /* printf("Select returned %d\n", select_result); */
-    /* printf("read_fds = %d\n", ((unsigned int*)&read_fds)[0]); */
-    for (int i = 0; i <= max_fd; i++) {
-      if (FD_ISSET(i, &read_fds)) {
-        if (i == sock) {
-          // New connection
-          struct in_addr addr;
-          SOCKET new_socket = acceptConnection(sock, &addr);
-          if (new_socket == INVALID_SOCKET)
-          {
-              cout << "Accept connection failed \n";
+  try
+  {
+      while (1) {
+          fd_set read_fds = fds;
+          int select_result = select((int)max_fd + 1, &read_fds, NULL, NULL, NULL);
+          if (select_result < 0) {
+              cout << "Error select failed";
+              return;
+          }
+          else if (select_result == 0) {
               continue;
           }
-          if (handleConnect(new_socket, addr) < 0) {
-             return;
+          /* printf("Select returned %d\n", select_result); */
+          /* printf("read_fds = %d\n", ((unsigned int*)&read_fds)[0]); */
+          for (int i = 0; i <= max_fd; i++) {
+              if (FD_ISSET(i, &read_fds)) {
+                  if (i == sock) {
+                      // New connection
+                      struct in_addr addr;
+                      SOCKET new_socket = acceptConnection(sock, &addr);
+                      if (new_socket == INVALID_SOCKET)
+                      {
+                          cout << "Accept connection failed \n";
+                          continue;
+                      }
+                      if (handleConnect(new_socket, addr) < 0) {
+                          return;
+                      }
+                  }
+                  else {
+                      if (processMessage(i) < 0)
+                          return;
+                  }
+              }
           }
-        } else {
-          if (processMessage(i) < 0)
-            return;
-        }
       }
-    }
+  }
+  catch (const std::exception& except)
+  {
+      publicFile.close();
+      cmdFile.close();
+      remove("Command-Log.txt");
+      remove("Convo-Log.txt");
+      cout << "Logs removed for clean-up due to exception " << except.what() << "\n";
   }
 }
 
@@ -393,4 +499,13 @@ void Connection::Close()
         }
         sock = INVALID_SOCKET;
     }
+}
+
+int Server::Disconnect(shared_ptr<Connection> cnct)
+{
+    FD_CLR(cnct->sock, &fds);
+    shutdown(cnct->sock, SD_BOTH);
+    cnct->Close();
+    connections.erase(find(connections.begin(), connections.end(), cnct));
+    return 0;
 }
