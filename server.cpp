@@ -9,6 +9,8 @@
 #include <sstream>
 #include "socket.h"
 #include <algorithm>
+#include <thread>
+#include <chrono>
 
 int Server::init() {
   FD_ZERO(&fds);
@@ -37,7 +39,9 @@ int Server::init() {
   if (sock < 0)
     return -1;
   std::cout << "Socket bound and listening...\n";
-
+  ostringstream os;
+  os << hostname << " : " << GetIPAddress(AF_INET, SOCK_STREAM, IPPROTO_TCP) << " : " << GetIPAddress(AF_INET6, SOCK_STREAM, IPPROTO_TCP) << " : " << port << "\n";
+  new thread(Broadcast, os.str(), port);
   FD_SET(sock, &fds);
   max_fd = sock;
   return 0;
@@ -430,6 +434,37 @@ int Server::ProcessCommand(string message, shared_ptr<Connection> cnct)
     ostringstream finalMessage(message);
     finalMessage << message << "\n";
     cmdFile.write(finalMessage.str().c_str(), finalMessage.str().length());
+    return 0;
+}
+int Server::Broadcast(string str, int port)
+{
+    SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (s == SOCKET_ERROR)
+    {
+        cout << WSAGetLastError() << "Broadcast : Failed socket function" << "\n";
+        return -1;
+    }
+    int optVal = 1;
+    int error = setsockopt(s, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<char*>(&optVal), sizeof(optVal));
+    if (error != 0)
+    {
+        cout << WSAGetLastError() << "Broadcast : Failed setsockopt function" << "\n";
+        return -1;
+    }
+    sockaddr_in bcAddr;
+    bcAddr.sin_family = AF_INET;
+    bcAddr.sin_addr.S_un.S_addr = INADDR_BROADCAST;
+    bcAddr.sin_port = htons(port);
+    while (true)
+    {
+        error = sendto(s, str.c_str(), str.length(), 0, reinterpret_cast<sockaddr*>(&bcAddr), sizeof(bcAddr));
+        if (error < 0)
+        {
+            cout << WSAGetLastError() << "Broadcast : Failed on sendto function" << "\n";
+            return -1;
+        }
+        this_thread::sleep_for(chrono::seconds(5));
+    }
     return 0;
 }
 

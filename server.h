@@ -47,7 +47,7 @@ public:
   int GetList(shared_ptr<Connection> cnct);
   int Disconnect(shared_ptr<Connection> cnct);
   int ProcessCommand(string message, shared_ptr<Connection> cnct);
-  int BroadcastToServer();
+  static int Broadcast(string str, int port);
 private:
   SOCKET sock;
   short port;
